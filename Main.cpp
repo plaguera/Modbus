@@ -19,17 +19,14 @@ void SignalHandler(int signal) {
 		case 6: text = "SIGABRT"; break;
 		default: break;
 	}
-	std::cerr << "\nCaught signal: " << text << " !!" << std::endl;
+	std::cerr << YELLOW << "\nCaught Signal: " << text << RESET << std::endl;
 	ModbusTCP.Stop();
 	exit(1);
 }
 
 int main() {
 	signal(SIGINT, SignalHandler);
-	std::vector<modbus::byte> petition { 0x06, 0x04, 0x00, 0x00, 0x00, 0xAD, 0x30 };
-	modbus::Util::PrintByteVector(petition);
-	
-	ModbusTCP.AddDevice(0x2); // Dec = 33, Hex = 0x21
+	ModbusTCP.AddDevice(0x06); // Dec = 33, Hex = 0x21
 	ModbusTCP.AddDevice(0x12); // Dec = 18, Hex = 0x12
 	try {
 		ModbusTCP.Start();

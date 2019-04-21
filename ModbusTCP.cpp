@@ -12,8 +12,10 @@ namespace modbus {
 
     void ModbusTCP::Start() {
         sockfd = socket(AF_INET, SOCK_STREAM, 0); // Create new socket, save file descriptor
-        if (sockfd < 0)
-            std::cerr << "ERROR opening socket" << std::endl;
+        if (sockfd < 0) {
+            Util::Error(UNABLE_TO_OPEN_SOCKET);
+            return;
+        }
 
         int reusePort = 1; // Disables default "wait time" after port is no longer in use before it is unbound
         setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &reusePort, sizeof(reusePort));
@@ -24,12 +26,14 @@ namespace modbus {
         serv_addr.sin_port = htons(portno); // Converts number from host byte order to network byte order
         serv_addr.sin_addr.s_addr = INADDR_ANY; // Sets the IP address of the machine on which this server is running
 
-        if (bind(sockfd, (sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) // Bind the socket to the address
-            std::cerr << "ERROR on binding" << std::endl;
+        if (bind(sockfd, (sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+            Util::Error(UNABLE_TO_BIND);
+            return;
+        }
 
         unsigned int backlogSize = 5; // Number of connections that can be waiting while another finishes
         listen(sockfd, backlogSize);
-        std::cout << "C++ server opened on port " << portno << std::endl;
+        std::cout << Util::Color(MAGENTA, "C++ Server Opened on Port " + portno) << std::endl;
 
         threads_stop = false;
         t_server = std::thread(&ModbusTCP::Listen, this);
@@ -40,7 +44,7 @@ namespace modbus {
     void ModbusTCP::CommandPrompt() {
         std::string input;
         while (!threads_stop) {
-            std::cout << "> $ ";
+            //std::cout << "> $ ";
             std::getline(std::cin, input);
             ProcessCommand(input);
         }
@@ -48,13 +52,16 @@ namespace modbus {
 
     void ModbusTCP::ProcessCommand(std::string input) {
         if (input.length() == 0 || std::all_of(input.begin(),input.end(),isspace)) return;
-
         selected_device->Update();
         std::transform(input.begin(), input.end(), input.begin(), ::tolower);
         Command cmd = Util::TokenizeCommand(input);
         switch (cmd.command)
         {
         case DEVICES:
+            if(!regex_match(input, std::regex("(devices)"))) {
+                Util::Error(BAD_COMMAND_SYNTAX);
+                break;
+            }
             for (int i = 0; i < devices.size(); i++) {
                 if (devices[i] == selected_device)
                     std::cout << i+1 << ".- [" << *devices[i] << "]" << std::endl;
@@ -64,11 +71,19 @@ namespace modbus {
             break;
 
         case STOP:
+            if(!regex_match(input, std::regex("(stop)"))) {
+                Util::Error(BAD_COMMAND_SYNTAX);
+                break;
+            }
             Stop();
             break;
 
         case GET:
             {
+                if(!regex_match(input, std::regex("(get)\\s*(((analog)|(digital)|(input)|(output))\\s*)*"))) {
+                    Util::Error(BAD_COMMAND_SYNTAX);
+                    break;
+                }
                 bool analog = std::find(cmd.args.begin(), cmd.args.end(), "analog") != cmd.args.end();
                 bool digital = std::find(cmd.args.begin(), cmd.args.end(), "digital") != cmd.args.end();
                 bool input = std::find(cmd.args.begin(), cmd.args.end(), "input") != cmd.args.end();
@@ -80,16 +95,20 @@ namespace modbus {
 
         case SET:
             {
+                if(!regex_match(input, std::regex("(set)\\s+((analog)|(digital))\\s+[0-9]{1,2})"))) {
+                    Util::Error(BAD_COMMAND_SYNTAX);
+                    break;
+                }
                 bool analog = cmd.args[0] == "analog";
                 int position = stoi(cmd.args[1]), value;
                 if (position < 15 || position > 19) {
-                    std::cerr << "Invalid Position !!" << std::endl;
+                    Util::Error(INVALID_DATA);
                     break;
                 }
                 std::cout << "Device " << *selected_device << " << " << (analog ? "Analog" : "Digital") << "[" << position << "] >> = ";
                 std::cin >> value;
                 if (!analog && value != 0 && value != 1) {
-                    std::cerr << "Invalid Digital Register Value !!" << std::endl;
+                    Util::Error(INVALID_DATA);
                     break;
                 }
                 if (analog) selected_device->SetAnalogInput(position, value);
@@ -99,6 +118,10 @@ namespace modbus {
 
         case SELECT:
             {
+                if(!regex_match(input, std::regex("(select)\\s*((?:0[xX])?[0-9a-fA-F]+)?"))) {
+                    Util::Error(BAD_COMMAND_SYNTAX);
+                    break;
+                }
                 if (cmd.args.empty()) {
                     std::cout << *selected_device << std::endl;
                     break;
@@ -109,6 +132,10 @@ namespace modbus {
             break;
         
         case HELP:
+            if(!regex_match(input, std::regex("(help)"))) {
+                Util::Error(BAD_COMMAND_SYNTAX);
+                break;
+            }
             std::cout << "Commands:" << std::endl;
             std::cout << "\tDEVICES" << std::endl;
             std::cout << "\tGET  [Analog | Digital | Input | Output]*" << std::endl;
@@ -119,37 +146,8 @@ namespace modbus {
             break;
 
         case UNKNOWN:
-        default: std::cerr << "Invalid Command !!" << std::endl; break;
+        default: Util::Error(COMMAND_NOT_FOUND); break;
         }
-        return;
-        /*
-            std::regex regex("([a]|[d]|(analog)|(digital))[\\[][[:digit:]]{2}[\\]][=][[:digit:]]+");
-            std::cout << "Enter Expression: ";
-            std::getline(std::cin, input);
-            std::transform(input.begin(), input.end(), input.begin(), ::tolower);
-            input.erase(remove(input.begin(), input.end(), ' '), input.end());
-            std::cout << input << "\n";
-            if(!regex_match(input, regex)) std::cerr << "Expression Error !!" << std::endl;
-
-            std::regex regex_word("[a-z]+");
-            std::smatch match;
-            std::string mode, tmp = input;
-            while (std::regex_search(tmp, match, regex_word)) {
-                mode = match[0];
-                tmp = match.suffix();
-            }
-
-            std::regex regex_int("[[:digit:]]+");
-            int position, value, i = 0;
-            tmp = input;
-            while (std::regex_search(tmp, match, regex_int)) {
-                if (i == 0) position = std::stoi(match[0]);
-                else if (i == 1) value = std::stoi(match[0]);
-                else break;
-                tmp = match.suffix();
-                i++;
-            }
-        } */
     }
 
     void ModbusTCP::Listen() {
@@ -160,54 +158,56 @@ namespace modbus {
 
             cli_len = sizeof(sockaddr_in);
             newsockfd = accept(sockfd, (sockaddr *) &cli_addr, &cli_len); // Block until a client connects
-            if (newsockfd < 0)
-                std::cerr << "ERROR on accept" << std::endl;
-            std::cout << inet_ntoa(cli_addr.sin_addr) << ":" << ntohs(cli_addr.sin_port) << " - Connected" << std::endl;
+            if (newsockfd < 0) {
+                 Util::Error(UNABLE_TO_ACCEPT);
+                 Stop();
+            }
+            std::string aux(inet_ntoa(cli_addr.sin_addr) + std::string(" : ") + std::to_string(ntohs(cli_addr.sin_port)));
+            std::cout << Util::FormatSockAddr(&cli_addr) << " - " << Util::Color(BOLD, Util::Color(GREEN, "Connected")) << std::endl;
 
             t_clients.push_back(std::thread(&ModbusTCP::HandleRequest, this, newsockfd, &cli_addr));
             t_clients.back().detach();
         }
     }
 
+    // echo -en '\x06\x03\x00\x00\x00\x01\x85\xBD' | nc localhost 1502 | xxd -ps -u | sed 's/.\{2\}/0x& /g'
     void ModbusTCP::HandleRequest(int newsockfd, sockaddr_in* cli_addr) {
-        std::vector<byte> input, output;
-        char msg[1000], buffer[1024];
-        ssize_t bytes_recieved = recv(newsockfd, buffer, 1024, 0);
+        char buffer[1024];
+        ssize_t bytes_recieved = 0, bytes_sent;
+        do {
+            bytes_recieved = recv(newsockfd, buffer, 1024, 0);
+            if (bytes_recieved <= 0) break;
+
+            byte* array = (byte*) buffer;
+            std::vector<byte> input(array, array + sizeof(array)/sizeof(byte));
+
+            std::cout << Util::FormatSockAddr(cli_addr) + " - {Input}" << Util::ToString(input) << std::endl;
+            std::vector<byte> output = ProcessPetition(input);
+            if (!output.empty())
+                std::cout << "Response: " + Util::ToString(output) << std::endl;
+
+            const char* foo = reinterpret_cast<const char*>(output.data());
+            bytes_sent = send(newsockfd, foo, output.size(), 0);
+            if (bytes_sent <= 0) break;
+            
+        } while (bytes_recieved > 0);
         // If no data arrives, the program will just wait here until some data arrives.
-        if (bytes_recieved == 0) std::cerr << "host shut down." << std::endl;
-        if (bytes_recieved == -1)std::cerr << "recieve error!" << std::endl ;
-        bzero(buffer, 1024);
-        //std::cout << "[ " << cli_addr->sin_addr << " : " << cli_addr->sin_port << " ] - " << buffer << " - { " << bytes_recieved << " bytes }" << std::endl;
-        std::cout << "[("  << bytes_recieved << ") " << std::setfill('0') << std::hex ;
-        for (unsigned int i = 0; i < bytes_recieved; i++){
-            std::cout << std::setw(2) << (int)buffer[i] << ' ';
-            if (i <= 5) msg[i] = buffer[i];
-            else if (i > 5) input.push_back((byte)buffer[i]);
-        }
-        std::cout << "] " << std::dec;
-        std::cout << std::endl;
+        if (bytes_recieved == 0) std::cout << Util::FormatSockAddr(cli_addr) << " - " << Util::Color(BOLD, Util::Color(RED, "Disconnected")) << std::endl;
+        if (bytes_recieved == -1)  Util::Error(RECEIVE_ERROR);
+        close(newsockfd);
+    }
 
-        ModbusServer* mbs = GetDevice(input);
-        //if (mbs == 0) return;
-        output = mbs->Petition(input);
-
-        if (!output.empty()) {
-
-        }
-      /* AQUÍ DEBERÍAMOS INVOCAR A peticion( ) y devolver el valor vector generado
-       En primer lugar hay que convertir del array de char a vector de bytes,
-       para ello se puede usar: vector<byte>( v, v + sizeof(v)/sizeof(byte) )
-
-       Lo devuelto por peticion( ) hay que convertirlo a array,
-       para ello se puede usar: std::copy(v.begin(), v.end(), arr);
-
-       */
+    std::vector<byte> ModbusTCP::ProcessPetition(std::vector<byte> input) {
+        ModbusServer* device = Device(input[0]);
+        if (device != NULL)
+            return device->Petition(input);
+        return std::vector<byte>();
     }
 
     void ModbusTCP::Stop() {
         threads_stop = true;
         sockfd = -1;
-        std::cout << "Stopping server..." << std::endl;
+        std::cout << Util::Color(RED, "Stopping server...") << std::endl;
         close(sockfd);
     }
 
@@ -228,7 +228,7 @@ namespace modbus {
         for (int i = 0; i < devices.size(); i++)
             if (devices[i]->IsRequestForMe(input))
                 return devices[i];
-        std::cerr << "Invalid Device ID !!" << std::endl;
+        Util::Error(INVALID_DEVICE_ID);
         return NULL;
     }
 
@@ -236,7 +236,7 @@ namespace modbus {
         for (int i = 0; i < devices.size(); i++)
             if (devices[i]->GetID() == id)
                 return devices[i];
-        std::cerr << "Invalid Device ID !!" << std::endl;
+        Util::Error(INVALID_DEVICE_ID);
         return NULL;
     }
 

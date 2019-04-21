@@ -131,17 +131,22 @@ std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
 	if (!IsRequestForMe(input)) throw "Incorrect ID !!";
 	if (!Util::CheckCRC(input)) throw "Incorrect CRC Value !!";
 	Update();
+	std::vector<byte> output;
 	switch(input[1]) {
-		case 0x01: return fc01(input); break;
-		case 0x02: return fc01(input); break;
-		case 0x03: return fc03(input); break;
-		case 0x04: return fc04(input); break;
-		case 0x05: return fc05(input); break;
-		case 0x06: return fc06(input); break;
-		case 0x15: return fc15(input); break;
-		case 0x16: return fc16(input); break;
+		case 0x01: output = fc01(input); break;
+		case 0x02: output = fc02(input); break;
+		case 0x03: output = fc03(input); break;
+		case 0x04: output = fc04(input); break;
+		case 0x05: output = fc05(input); break;
+		case 0x06: output = fc06(input); break;
+		case 0x15: output = fc15(input); break;
+		case 0x16: output = fc16(input); break;
 		default: throw "No such operation !!";
 	}
+	analog_input[0]++;
+	analog_input[1] += input.size();
+	analog_input[2] += output.size();
+	return output;
 }
 
 std::vector<byte> ModbusServer::fc01(std::vector<byte> input) {
@@ -334,25 +339,21 @@ void ModbusServer::Print(int mode) {
 		ss << "Analog Inputs:\n";
 		for (int i = 0; i < analog_input.size(); i++)
 			ss << "\t[" << i+1 << "] = " << analog_input[i] << std::endl;
-		ss << std::endl;
 	}
 	if (mode == 15 || mode == 0 || mode == 4 || mode == 6 || mode == 3 || mode == 2) {
 		ss << "Digital Inputs:\n";
 		for (int i = 0; i < digital_input.size(); i++)
 			ss << "\t[" << i+1 << "] = " << digital_input[i] << std::endl;
-		ss << std::endl;
 	}
 	if (mode == 15 || mode == 0 || mode == 8 || mode == 9 || mode == 3 || mode == 1) {
 		ss << "Analog Outputs:\n";
 		for (int i = 0; i < analog_output.size(); i++)
 			ss << "\t[" << i+1 << "] = " << analog_output[i] << std::endl;
-		ss << std::endl << std::endl;
 	}
 	if (mode == 15 || mode == 0 || mode == 4 || mode == 5 || mode == 3 || mode == 1) {
 		ss << "Digital Outputs:\n";
 		for (int i = 0; i < digital_output.size(); i++)
 			ss << "\t[" << i+1 << "] = " << digital_output[i] << std::endl;
-		ss << std::endl;
 	}
 	std::cout << ss.str();
 }

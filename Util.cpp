@@ -28,6 +28,12 @@ byte Util::ToByte(std::string string) {
 	return (byte)value;
 }
 
+std::string Util::ToString(byte value) {
+	std::stringstream ss;
+	ss << "0x" << std::hex << std::setfill('0') << std::setw(2) << (int)value;
+	return ss.str();
+}
+
 bool Util::IsInt(std::string string) {
 	return std::all_of(string.begin(), string.end(), ::isdigit);
 }
@@ -60,15 +66,27 @@ bool Util::CheckCRC(std::vector<byte> input) {
 	byte msb = input.back();
 	input.pop_back();
 	std::vector<byte> crc = CRC(input);
-	//std::cout << std::hex << (int)crc[0] << (int)crc[1] << std::endl;
-	//std::cout << std::hex << (int)msb << (int)lsb << std::endl;
 	return crc[0] == msb && crc[1] == lsb;
 }
 
-void Util::PrintByteVector(std::vector<byte> input) {
+std::string Util::ToString(std::vector<byte> input) {
+	std::stringstream ss;
+	ss << "[("  << input.size() << ") ";
 	for (int i = 0; i < input.size(); i++)
-		std::cout << std::hex << (int)input[i] << ' ';
-	std::cout << std::dec << std::endl;
+		ss << Util::ToString(input[i]) << " ";
+	ss << "]" << std::dec;
+	return ss.str();
+}
+
+std::string Util::Color(std::string color, std::string string) {
+	std::stringstream ss;
+	ss << color << string << RESET;
+	return ss.str(); 
+}
+
+std::string Util::FormatSockAddr(sockaddr_in* addr) {
+	std::string aux(std::string("[ ") + inet_ntoa(addr->sin_addr) + std::string(" : ") + std::to_string(ntohs(addr->sin_port)) + std::string(" ]"));
+    return Util::Color(BOLD, Util::Color(BLUE, aux));
 }
 
 std::string Util::RemoveWhitespaces(std::string input) {
@@ -97,6 +115,35 @@ Command Util::TokenizeCommand(const std::string& str, const std::string& delimit
 	e_command e_cmd = map_command.find(tokens.front()) != map_command.end() ? map_command[tokens.front()] : UNKNOWN;
 	Command cmd(e_cmd, std::vector<std::string>(tokens.begin()+1, tokens.end()));
 	return cmd;
+}
+
+void Util::Error(e_error code, std::string text) {
+	std::cerr << RED << "ERROR [" << code << "]: " << text << RESET << std::endl;
+}
+
+void Util::Error(e_error code) {
+	std::string text;
+	switch (code) {
+		case FUNCTION_NOT_IMPLEMENTED: text = "Function Not Implemented"; break;
+		case RESGISTRY_OUT_OF_RANGE: text = "Registry Out of Range"; break;
+		case INVALID_DATA: text = "Invalid Request Data"; break;
+		case BAD_COMMAND_SYNTAX: text = "Bad Command Syntax"; break;
+		case COMMAND_NOT_FOUND: text = "Command Not Found"; break;
+		case INVALID_DEVICE_ID: text = "Invalid Device ID"; break;
+		case INVALID_CRC: text = "Invalid CRC Code"; break;
+		case UNABLE_TO_OPEN_SOCKET: text = "Unable to Open Socket"; break;
+		case UNABLE_TO_BIND: text = "Unable to Bind"; break;
+		case UNABLE_TO_ACCEPT: text = "Unable to Accept"; break;
+		case RECEIVE_ERROR: text = "Receive Error"; break;
+		default: break;
+	}
+	std::cerr << BOLD << RED << "ERROR [" << code << "]: " << text << RESET << std::endl;
+}
+
+void Util::Exception(e_error code, std::string text) {
+	std::stringstream ss;
+	ss << RED << "ERROR [" << code << "]: " << text << RESET;
+	throw ss.str();
 }
 
 } /* namespace modbus */

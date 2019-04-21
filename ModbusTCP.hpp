@@ -14,6 +14,7 @@ private:
     std::atomic<bool> threads_stop;
     void CommandPrompt();
     void ProcessCommand(std::string input);
+    std::vector<byte> ProcessPetition(std::vector<byte> input);
     void Listen();
     void HandleRequest(int newsockfd, sockaddr_in* cli_addr);
     ModbusServer* GetDevice(std::vector<byte> input);
