@@ -2,7 +2,7 @@
  * ModbusServer.hpp
  *
  *  Created on: Mar 21, 2019
- *      Author: pedro
+ *      Author: Pedro Lagüera Cabrera | alu0100891485
  */
 #ifndef MODBUSSERVER_H_
 #define MODBUSSERVER_H_
@@ -20,6 +20,7 @@ private:
 	std::vector<int> analog_input;
 	std::vector<int> analog_output;
 public:
+	ModbusServer(int id);
 	ModbusServer(byte id);
 	~ModbusServer();
 	void Update();
@@ -32,6 +33,7 @@ public:
 	std::vector<byte> fc06(std::vector<byte> input);
 	std::vector<byte> fc15(std::vector<byte> input);
 	std::vector<byte> fc16(std::vector<byte> input);
+	std::vector<byte> Exception(e_exception exception, std::vector<byte> input);
 	bool IsRequestForMe(std::vector<byte> input);
 	void Print(int mode);
 	byte GetID();

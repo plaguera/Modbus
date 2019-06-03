@@ -1,4 +1,7 @@
 /.vscode/
 *.o
-main
+ModbusTCP
+/test/Test1
+/test/Test2
+/test/Test3
 .DS_Store

@@ -8,6 +8,8 @@
 
 namespace modbus {
 
+ModbusServer::ModbusServer(int id) : ModbusServer((byte)id) {}
+
 ModbusServer::ModbusServer(byte id) {
 	this->id = id;
 	time_start = std::clock();
@@ -128,8 +130,8 @@ void ModbusServer::Update() {
 }
 
 std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
-	if (!IsRequestForMe(input)) throw "Incorrect ID !!";
-	if (!Util::CheckCRC(input)) throw "Incorrect CRC Value !!";
+	if (!IsRequestForMe(input)) return std::vector<byte>(); //throw "Incorrect ID !!";
+	if (!Util::CheckCRC(input)) return std::vector<byte>(); //throw "Incorrect CRC Value !!";
 	Update();
 	std::vector<byte> output;
 	switch(input[1]) {
@@ -139,9 +141,9 @@ std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
 		case 0x04: output = fc04(input); break;
 		case 0x05: output = fc05(input); break;
 		case 0x06: output = fc06(input); break;
-		case 0x15: output = fc15(input); break;
-		case 0x16: output = fc16(input); break;
-		default: throw "No such operation !!";
+		case 0x0F: output = fc15(input); break;
+		case 0x10: output = fc16(input); break;
+		default: output = Exception(ILLEGAL_FUNCTION, input);
 	}
 	analog_input[0]++;
 	analog_input[1] += input.size();
@@ -149,13 +151,34 @@ std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
 	return output;
 }
 
+std::vector<byte> ModbusServer::Exception(e_exception exception, std::vector<byte> input) {
+	byte function_code = input[1] | 0x80;
+	std::vector<byte> output { input[0], function_code };
+	byte code;
+	switch (exception) {
+		case ILLEGAL_FUNCTION: code = 0x01; break;
+		case ILLEGAL_DATA_ADDRESS: code = 0x02; break;
+		case ILLEGAL_DATA_VALUE: code = 0x03; break;
+		case SLAVE_DEVICE_FAILURE: code = 0x04; break;
+		case ACKNOWLEDGE: code = 0x05; break;
+		case SLAVE_DEVICE_BUSY: code = 0x06; break;
+		case NEGATIVE_ACKNOWLEDGE: code = 0x07; break;
+		case MEMORY_PARITY_ERROR: code = 0x08; break;
+		case GATEWAY_PATH_UNAVAILABLE: code = 0x0A; break;
+		case GATEWAY_TARGET_DEVICE_FAILED_TO_RESPOND: code = 0x0B; break;
+		default: break;
+	}
+	output.push_back(code);
+	return Util::AddCRC(output);
+}
+
 std::vector<byte> ModbusServer::fc01(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1] };
 	int first_coil = Util::ToInt(input[2], input[3]);
 	int n_coils = Util::ToInt(input[4], input[5]);
 
-	if (first_coil < 0 || first_coil >= N_DIGITAL_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (first_coil + n_coils >= N_DIGITAL_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
+	if (first_coil < 0 || first_coil >= N_DIGITAL_OUTPUTS)return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (first_coil + n_coils > N_DIGITAL_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
 	
 	int data_bytes = (byte) (ceil( (float) n_coils / 8 ));
 	output.push_back(data_bytes);
@@ -172,8 +195,8 @@ std::vector<byte> ModbusServer::fc01(std::vector<byte> input) {
 				value ^= BYTE_ONE;
 			else
 				value ^= BYTE_ZERO;
-			std::cout << digital_output[current] << std::endl;
-			std::cout << std::bitset<8>(value) << std::endl;
+			//std::cout << digital_output[current] << std::endl;
+			//std::cout << std::bitset<8>(value) << std::endl;
 			coils_read++;
 		}
 		start += to_read;
@@ -187,8 +210,8 @@ std::vector<byte> ModbusServer::fc02(std::vector<byte> input) {
 	int first_coil = Util::ToInt(input[2], input[3]);
 	int n_coils = Util::ToInt(input[4], input[5]);
 
-	if (first_coil < 0 || first_coil >= N_DIGITAL_INPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (first_coil + n_coils >= N_DIGITAL_INPUTS) throw "Invalid Data: Register is Out of Range !!";
+	if (first_coil < 0 || first_coil >= N_DIGITAL_INPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (first_coil + n_coils > N_DIGITAL_INPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
 	
 	int data_bytes = (byte) (ceil( (float) n_coils / 8 ));
 	output.push_back(data_bytes);
@@ -218,9 +241,9 @@ std::vector<byte> ModbusServer::fc03(std::vector<byte> input) {
 	int data_address = Util::ToInt(input[2], input[3]);
 	int n_registers = Util::ToInt(input[4], input[5]);
 
-	if (data_address < 0 || data_address >= N_ANALOG_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (data_address + n_registers >= N_ANALOG_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	
+	if (data_address < 0 || data_address >= N_ANALOG_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (data_address + n_registers > N_ANALOG_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+
 	output.push_back((byte)(2 * n_registers));
 	for (int i = 0; i < n_registers; i++) {
 		output.push_back((char)(analog_output[data_address + i] >> 8));
@@ -234,9 +257,9 @@ std::vector<byte> ModbusServer::fc04(std::vector<byte> input) {
 	int data_address = Util::ToInt(input[2], input[3]);
 	int n_registers = Util::ToInt(input[4], input[5]);
 
-	if (input.size() != 8) throw "Invalid Request !!";
-	if (data_address < 0 || data_address >= N_ANALOG_INPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (data_address + n_registers >= N_ANALOG_INPUTS) throw "Invalid Data: Register is Out of Range !!";
+	if (input.size() != 8) return Exception(ILLEGAL_DATA_VALUE, input);
+	if (data_address < 0 || data_address >= N_ANALOG_INPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (data_address + n_registers > N_ANALOG_INPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
 
 	output.push_back((byte)(2 * n_registers));
 	for (int i = 0; i < n_registers; i++)
@@ -249,8 +272,8 @@ std::vector<byte> ModbusServer::fc05(std::vector<byte> input) {
 	int coil_address = Util::ToInt(input[2], input[3]);
 	int status = Util::ToInt(input[4], input[5]);
 
-	if (coil_address < 0 || coil_address >= N_DIGITAL_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (status != 0xFF00 && status != 0x0000) throw "Invalid Data: Value is not 0xFF00 or 0x0000 !!";
+	if (coil_address < 0 || coil_address >= N_DIGITAL_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (status != 0xFF00 && status != 0x0000) return Exception(ILLEGAL_DATA_VALUE, input);
 
 	digital_output[coil_address] = status == 0xFF00;
 	return Util::AddCRC(output);
@@ -261,7 +284,7 @@ std::vector<byte> ModbusServer::fc06(std::vector<byte> input) {
 	int coil_address = Util::ToInt(input[2], input[3]);
 	int value = Util::ToInt(input[4], input[5]);
 
-	if (coil_address < 0 || coil_address >= N_ANALOG_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
+	if (coil_address < 0 || coil_address >= N_ANALOG_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
 
 	analog_output[coil_address] = value;
 	return Util::AddCRC(output);
@@ -273,8 +296,8 @@ std::vector<byte> ModbusServer::fc15(std::vector<byte> input) {
 	int n_coils = Util::ToInt(input[4], input[5]);
 	int data_bytes = (byte) input[6];
 
-	if (first_coil < 0 || first_coil >= N_DIGITAL_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (first_coil + n_coils >= N_DIGITAL_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
+	if (first_coil < 0 || first_coil >= N_DIGITAL_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (first_coil + n_coils > N_DIGITAL_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
 
 	int start = first_coil, coils_read = 0;
 	for (int i = 0; i < data_bytes; i++) {
@@ -299,19 +322,16 @@ std::vector<byte> ModbusServer::fc16(std::vector<byte> input) {
 	int n_registers = Util::ToInt(input[4], input[5]);
 	int data_bytes = (byte) input[6];
 
-	if (first_register < 0 || first_register >= N_ANALOG_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (first_register + n_registers >= N_ANALOG_OUTPUTS) throw "Invalid Data: Register is Out of Range !!";
-	if (input.size() != (unsigned)n_registers + 9) throw "Invalid Request !!";
+	if (first_register < 0 || first_register >= N_ANALOG_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (first_register + n_registers > N_ANALOG_OUTPUTS) return Exception(ILLEGAL_DATA_ADDRESS, input);
+	if (n_registers*2 != data_bytes) return Exception(ILLEGAL_DATA_VALUE, input);
 
 	std::vector<int> values;
 	for (int i = 0; i < data_bytes; i += 2) {
     	int a = (int) Util::ToInt(input[7+i], input[7+i+1]);
 		values.push_back(a);
 	}
-	for (int i = 0; i < values.size(); i++)
-	std::cout << values[i] << " ";
-	std::cout << std::endl;
-	for (int i = 0; i < data_bytes; i++) analog_output[first_register+i] = values[i];
+	for (int i = 0; i < n_registers; i++) analog_output[first_register+i] = values[i];
 
 	return Util::AddCRC(output);
 }
