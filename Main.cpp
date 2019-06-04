@@ -6,7 +6,8 @@
  */
 #include "ModbusTCP.hpp"
 
-modbus::ModbusTCP ModbusTCP;
+std::vector<int> devices {33, 18};
+modbus::ModbusTCP mbstcp(devices);
 
 // Función que maneja señales de interrupción
 void SignalHandler(int signal) {
@@ -21,17 +22,15 @@ void SignalHandler(int signal) {
 		default: break;
 	}
 	std::cerr << YELLOW << "\nCaught Signal: " << text << RESET << std::endl;
-	ModbusTCP.Stop();
+	mbstcp.Stop();
 	exit(1);
 }
 // echo -en '\x06\x03\x00\x00\x00\x01\x85\xBD' | nc localhost 1502 | xxd -ps -u | sed 's/.\{2\}/0x& /g'
 // Manejar la señal SIGINT, añadimos los dos dispositivos del enunciado: 33 y 18
 int main() {
 	signal(SIGINT, SignalHandler);
-	ModbusTCP.AddDevice(0x21); // Dec = 33, Hex = 0x21
-	ModbusTCP.AddDevice(0x12); // Dec = 18, Hex = 0x12
 	try {
-		ModbusTCP.Start();
+		mbstcp.Start();
 	} catch (const char* msg) {
 		std::cerr << msg << std::endl;
 	}

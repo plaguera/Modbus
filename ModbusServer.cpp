@@ -21,69 +21,18 @@ ModbusServer::ModbusServer(byte id) {
 	analog_output = std::vector<int>(N_ANALOG_OUTPUTS, 0);
 
 	// Analog Inputs
-
-	/* Counters */
-	// Received Petition Counter
-	analog_input[0] = 0;
-	// Bytes Received
-	analog_input[1] = 0;
-	// Bytes Sent
-	analog_input[2] = 0;
-
-	/* Date */
-	// Year
-	analog_input[3] = 0;
-	// Month
-	analog_input[4] = 0;
-	// Day
-	analog_input[5] = 0;
-	// Hour
-	analog_input[6] = 0;
-	// Minute
-	analog_input[7] = 0;
-	// Second
-	analog_input[8] = 0;
-
-	/* CPU Time */
-	// Seconds
-	analog_input[9] = 0;
-	// Miliseconds
-	analog_input[10] = 0;
-
-	/* Process Information */
-	// UID
-	analog_input[11] = 0;
-	// GID
-	analog_input[12] = 0;
-	// PID
-	analog_input[13] = 0;
-	// PPID
-	analog_input[14] = 0;
-
-	for (int i = 15; i < analog_input.size(); i += 2) {
-		analog_input[i] = 1111;
-	}
+	for (int i = 15; i < analog_input.size(); i += 2) analog_input[i] = 0;
+	for (int i = 15; i < analog_input.size(); i += 2) analog_input[i] = 1111;
 
 	// Analog Outputs
-	for (int i = 0; i < analog_output.size(); i++) {
-		analog_output[i] = i * 4;
-	}
-
-	// Digital Inputs
-	for (int i = 0; i < digital_input.size(); i++) {
-
-	}
+	for (int i = 0; i < analog_output.size(); i++) analog_output[i] = i * 4;
 
 	// Digital Outputs
-	for (int i = 0; i < digital_output.size(); i += 2) {
-		digital_output[i] = true;
-	}
+	for (int i = 0; i < digital_output.size(); i += 2) digital_output[i] = true;
 }
 
 // Destructor
-ModbusServer::~ModbusServer() {
-	// TODO Auto-generated destructor stub
-}
+ModbusServer::~ModbusServer() {}
 
 // Actualizar los registros
 void ModbusServer::Update() {
@@ -135,8 +84,15 @@ void ModbusServer::Update() {
 
 // Procesar una petición y devolver una respuesta
 std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
-	if (!IsRequestForMe(input)) return std::vector<byte>(); //throw "Incorrect ID !!";
-	if (!Util::CheckCRC(input)) return std::vector<byte>(); //throw "Incorrect CRC Value !!";
+	if (!IsRequestForMe(input)) {
+		Util::Error(INVALID_DEVICE_ID);
+		return std::vector<byte>();
+	}
+	if (!Util::CheckCRC(input)) {
+		Util::Error(INVALID_CRC);
+		return std::vector<byte>();
+	}
+
 	Update();
 	std::vector<byte> output;
 	switch(input[1]) {
@@ -406,7 +362,7 @@ void ModbusServer::Print(int mode) {
 // Sobrecarga operador <<
 std::ostream& operator<<(std::ostream& os, const ModbusServer& mbs)
 {
-	os << "0x" << std::hex << std::setfill('0') << std::setw(2) << (int)mbs.id << std::dec;
+	os << (int)mbs.id << "(0x" << std::hex << std::setfill('0') << std::setw(2) << (int)mbs.id << std::dec << ")";
     os << std::resetiosflags(std::ios::showbase);
     return os;
 }

@@ -9,7 +9,8 @@
 namespace modbus {
 
 // Mapa de correspondencia entre comandos en texto y sus valores en la enumeración
-std::map<std::string, e_command> Util::map_command = { 	{ COMMAND_DEVICES, DEVICES },
+std::map<std::string, e_command> Util::map_command = { 	{ COMMAND_CONNECTIONS, CONNECTIONS },
+														{ COMMAND_DEVICES, DEVICES },
 														{ COMMAND_GET, GET },
 														{ COMMAND_HELP, HELP },
 														{ COMMAND_SELECT, SELECT },

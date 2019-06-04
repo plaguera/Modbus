@@ -9,6 +9,7 @@
 
 #define BYTE_ZERO 0x00000000
 #define BYTE_ONE 0x00000001
+#define COMMAND_CONNECTIONS "connections"
 #define COMMAND_DEVICES "devices"
 #define COMMAND_GET "get"
 #define COMMAND_HELP "help"
@@ -79,6 +80,7 @@ enum e_command {
 	SET,		// Cambiar el valor de los últimos 5 registros analógicos o digitales
 	SELECT,		// Seleccionar un dispositivo
 	DEVICES,	// Mostrar dispositivos conectados
+	CONNECTIONS,// Mostrar conexiones abiertas
 	HELP,		// Mostrar ayuda
 	UNKNOWN		// Comando desconocido
 };
@@ -104,6 +106,15 @@ struct Command
     e_command command;
     std::vector<std::string> args;
 	Command(e_command cmd, std::vector<std::string> args) : command(cmd), args(args) {}
+};
+
+// Objeto Cliente tiene un socket, sockaddr_in y thread
+struct Client
+{
+	int sockfd;
+	sockaddr_in* address;
+	std::thread thread;
+	Client(int arg_sockfd, sockaddr_in* arg_address) : sockfd(arg_sockfd), address(arg_address) {}
 };
 
 // Funciones y variables estáticas de utilidades y funciones que todos pueden usar

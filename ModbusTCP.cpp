@@ -9,7 +9,9 @@
 namespace modbus {
 
     // Inicializar el servidor
-    ModbusTCP::ModbusTCP() : devices(std::vector<ModbusServer*>()), sockfd(-1) {
+    ModbusTCP::ModbusTCP(std::vector<int> ids) : devices(std::vector<ModbusServer*>()), sockfd(-1) {
+        for (int i = 0; i < ids.size(); i++)
+            AddDevice(ids[i]);
     }
 
     // Destruir todos los dispositivos existentes
@@ -76,10 +78,19 @@ namespace modbus {
             }
             for (int i = 0; i < devices.size(); i++) {
                 if (devices[i] == selected_device)
-                    std::cout << i+1 << ".- [" << *devices[i] << "]" << std::endl;
+                    std::cout << i+1 << ".- " << BOLD << *devices[i] << "*" << RESET << std::endl;
                 else
                     std::cout << i+1 << ".- " << *devices[i] << std::endl;
             }
+            break;
+
+        case CONNECTIONS:
+            if(!regex_match(input, std::regex("(connections)"))) {
+                Util::Error(BAD_COMMAND_SYNTAX);
+                break;
+            }
+            for (int i = 0; i < clients.size(); i++)
+                std::cout << Util::FormatSockAddr(clients[i].address) << std::endl;
             break;
 
         case STOP:
@@ -138,7 +149,7 @@ namespace modbus {
                     std::cout << *selected_device << std::endl;
                     break;
                 }
-                ModbusServer* device = Device(Util::ToByte(cmd.args[0]));
+                ModbusServer* device = Device(std::stoi(cmd.args[0]));
                 if (device != NULL) selected_device = device;
             }
             break;
@@ -178,17 +189,18 @@ namespace modbus {
             std::cout << Util::FormatSockAddr(&cli_addr) << " - " << Util::Color(BOLD, Util::Color(GREEN, "Connected")) << std::endl;
 
             // Crear hilo que ejecute 'HandleRequest' para el nuevo cliente y almacenarlo en la lista
-            t_clients.push_back(std::thread(&ModbusTCP::HandleRequest, this, newsockfd, &cli_addr));
-            t_clients.back().detach();
+            clients.push_back(Client(newsockfd, &cli_addr));
+            clients.back().thread = std::thread(&ModbusTCP::HandleRequest, this, newsockfd, &cli_addr);
+            clients.back().thread.detach();
         }
     }
 
     // Escucha por mensajes del cliente correspondiente y cuando los recibe, se procesan y devuelve una respuesta
-    void ModbusTCP::HandleRequest(int newsockfd, sockaddr_in* cli_addr) {
+    void ModbusTCP::HandleRequest(int sockfd, sockaddr_in* cli_addr) {
         char buffer[1024];
         ssize_t bytes_received = 0, bytes_sent;
         do {
-            bytes_received = recv(newsockfd, buffer, 1024, 0);  // Bloquear hasta que se recibe un mensaje
+            bytes_received = recv(sockfd, buffer, 1024, 0);  // Bloquear hasta que se recibe un mensaje
             if (bytes_received <= 0) break;                     // El cliente se ha desconectado
 
             byte* array = (byte*) buffer;                                       // Convertir el mensaje de char* a byte*
@@ -197,17 +209,22 @@ namespace modbus {
             std::cout << Util::FormatSockAddr(cli_addr) + " - {Input}" << Util::ToString(input) << std::endl;
             std::vector<byte> output = ProcessPetition(input);                  // Procesar petición y guardar respuesta
             if (!output.empty())
-                std::cout << "Response: " + Util::ToString(output) << std::endl;
+                std::cout << " --> {Response}: " + Util::ToString(output) << std::endl;
+            else
+                std::cout << " --> {Response}: [(0) ]" << std::endl;
 
             const char* foo = reinterpret_cast<const char*>(output.data());     // Convertir respuesta de vector<byte> a char*
-            bytes_sent = send(newsockfd, foo, output.size(), 0);                // Enviar respuesta
-            if (bytes_sent <= 0) break;
+            bytes_sent = send(sockfd, foo, output.size(), 0);                   // Enviar respuesta
+            if (bytes_sent < 0) break;
             
         } while (bytes_received > 0);
         
         if (bytes_received == 0) std::cout << Util::FormatSockAddr(cli_addr) << " - " << Util::Color(BOLD, Util::Color(RED, "Disconnected")) << std::endl;
         if (bytes_received == -1)  Util::Error(RECEIVE_ERROR);
-        close(newsockfd);
+        for (int i = 0; i < clients.size(); i++)
+            if (clients[i].sockfd == sockfd)
+                clients.erase(clients.begin() + i);                             // Eliminar cliente de la lista
+        close(sockfd);                                                          // Cerrar socket
     }
 
     // Buscar dispositivo correspondiente a la petición y que la procese
@@ -228,13 +245,8 @@ namespace modbus {
 
     // Añadir un nuevo dispositivo con el identificador especificado
     void ModbusTCP::AddDevice(byte id) {
-        AddDevice(new ModbusServer(id));
-    }
-
-    // Añadir el nuevo dispositivo especificado
-    void ModbusTCP::AddDevice(ModbusServer* mbs) {
-        devices.push_back(mbs);
-        if (devices.size() == 1) selected_device = mbs;
+        devices.push_back(new ModbusServer(id));
+        if (devices.size() == 1) selected_device = devices.back();
     }
 
     // Devuelve el dispositivo con el identificador especificado
