@@ -13,15 +13,17 @@ default: ModbusTCP
 ModbusTCP: $(MTCP_OBJECTS)
 	$(CXX) $(MTCP_OBJECTS) -o $@ $(CXXFLAGS)
 
-Test1: $(T1_OBJECTS)
+test1: $(T1_OBJECTS)
 	$(CXX) $(T1_OBJECTS) -o $@ $(CXXFLAGS)
 
-Test2: $(T2_OBJECTS)
+test2: $(T2_OBJECTS)
 	$(CXX) $(T2_OBJECTS) -o $@ $(CXXFLAGS)
 
-Test3: $(T3_OBJECTS)
+test3: $(T3_OBJECTS)
 	$(CXX) $(T3_OBJECTS) -o $@ $(CXXFLAGS)
+
+tests: test1 test2 test3
 
 clean:
 	-rm -f $(MTCP_OBJECTS) $(T1_OBJECTS) $(T2_OBJECTS) $(T3_OBJECTS)
-	-rm -f ModbusTCP Test1 Test2 Test3
+	-rm -f ModbusTCP test1 test2 test3

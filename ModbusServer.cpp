@@ -8,8 +8,10 @@
 
 namespace modbus {
 
+// Crear dispositivo a partir de ID en decimal
 ModbusServer::ModbusServer(int id) : ModbusServer((byte)id) {}
 
+// Crear dispositivo a partir de ID en byte
 ModbusServer::ModbusServer(byte id) {
 	this->id = id;
 	time_start = std::clock();
@@ -78,10 +80,12 @@ ModbusServer::ModbusServer(byte id) {
 	}
 }
 
+// Destructor
 ModbusServer::~ModbusServer() {
 	// TODO Auto-generated destructor stub
 }
 
+// Actualizar los registros
 void ModbusServer::Update() {
 
 	std::time_t t = std::time(0);
@@ -129,6 +133,7 @@ void ModbusServer::Update() {
 	}
 }
 
+// Procesar una petición y devolver una respuesta
 std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
 	if (!IsRequestForMe(input)) return std::vector<byte>(); //throw "Incorrect ID !!";
 	if (!Util::CheckCRC(input)) return std::vector<byte>(); //throw "Incorrect CRC Value !!";
@@ -151,6 +156,7 @@ std::vector<byte> ModbusServer::Petition(std::vector<byte> input) {
 	return output;
 }
 
+// Genera respuesta adecuada en caso de excepción en una fc
 std::vector<byte> ModbusServer::Exception(e_exception exception, std::vector<byte> input) {
 	byte function_code = input[1] | 0x80;
 	std::vector<byte> output { input[0], function_code };
@@ -172,6 +178,7 @@ std::vector<byte> ModbusServer::Exception(e_exception exception, std::vector<byt
 	return Util::AddCRC(output);
 }
 
+// Leer salidas digitales
 std::vector<byte> ModbusServer::fc01(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1] };
 	int first_coil = Util::ToInt(input[2], input[3]);
@@ -205,6 +212,7 @@ std::vector<byte> ModbusServer::fc01(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Leer entradas digitales
 std::vector<byte> ModbusServer::fc02(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1] };
 	int first_coil = Util::ToInt(input[2], input[3]);
@@ -236,6 +244,7 @@ std::vector<byte> ModbusServer::fc02(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Leer salidas analógicas
 std::vector<byte> ModbusServer::fc03(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1] };
 	int data_address = Util::ToInt(input[2], input[3]);
@@ -252,6 +261,7 @@ std::vector<byte> ModbusServer::fc03(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Leer entradas analógicas
 std::vector<byte> ModbusServer::fc04(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1] };
 	int data_address = Util::ToInt(input[2], input[3]);
@@ -267,6 +277,7 @@ std::vector<byte> ModbusServer::fc04(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Escribir salida digital única
 std::vector<byte> ModbusServer::fc05(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1], input[2], input[3], input[4], input[5] };
 	int coil_address = Util::ToInt(input[2], input[3]);
@@ -279,6 +290,7 @@ std::vector<byte> ModbusServer::fc05(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Escribir salida analógica única
 std::vector<byte> ModbusServer::fc06(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1], input[2], input[3], input[4], input[5] };
 	int coil_address = Util::ToInt(input[2], input[3]);
@@ -290,6 +302,7 @@ std::vector<byte> ModbusServer::fc06(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Escribir salidas digitales múltiples
 std::vector<byte> ModbusServer::fc15(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1], input[2], input[3], input[4], input[5] };
 	int first_coil = Util::ToInt(input[2], input[3]);
@@ -316,6 +329,7 @@ std::vector<byte> ModbusServer::fc15(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Escribir salidas analógicas múltiples
 std::vector<byte> ModbusServer::fc16(std::vector<byte> input) {
 	std::vector<byte> output { input[0], input[1], input[2], input[3], input[4], input[5] };
 	int first_register = Util::ToInt(input[2], input[3]);
@@ -336,41 +350,52 @@ std::vector<byte> ModbusServer::fc16(std::vector<byte> input) {
 	return Util::AddCRC(output);
 }
 
+// Es la petición especificada para este dispositivo
 bool ModbusServer::IsRequestForMe(std::vector<byte> input) {
 	return id == input[0];
 }
 
+// Devolver ID
 byte ModbusServer::GetID() {
 	return id;
 }
 
+// Escribir 'value' en la posición 'position' de las entradas digitales
 void ModbusServer::SetDigitalInput(int position, int value) {
 	digital_input[position] = value != 0 ? 1 : 0;
 }
 
+// Escribir 'value' en la posición 'position' de las entradas analógicas
 void ModbusServer::SetAnalogInput(int position, int value) {
 	analog_input[position] = value;
 }
 
+// Imprimir los registros
+// El modo será un entero 0-15 representado por 4 bits
+// [Analog] [Digital] [Input] [Output]
+// Ejemplos:
+//			Analog Input --> 1010 = 10
+//			Analog Digital Input Output --> 1111 = 15
+//			Digital Input Output --> 0111 = 7
 void ModbusServer::Print(int mode) {
 	std::stringstream ss;
 
-	if (mode == 15 || mode == 0 || mode == 8 || mode == 10 || mode == 3 || mode == 2) {
+	if (mode == 15 || mode == 0 || mode == 8 || mode == 10 || mode == 3 || mode == 2 || mode == 11|| mode == 12 || mode == 14) {
 		ss << "Analog Inputs:\n";
 		for (int i = 0; i < analog_input.size(); i++)
 			ss << "\t[" << i+1 << "] = " << analog_input[i] << std::endl;
 	}
-	if (mode == 15 || mode == 0 || mode == 4 || mode == 6 || mode == 3 || mode == 2) {
+	if (mode == 15 || mode == 0 || mode == 4 || mode == 6 || mode == 3 || mode == 2 || mode == 7|| mode == 12 || mode == 14) {
 		ss << "Digital Inputs:\n";
 		for (int i = 0; i < digital_input.size(); i++)
 			ss << "\t[" << i+1 << "] = " << digital_input[i] << std::endl;
 	}
-	if (mode == 15 || mode == 0 || mode == 8 || mode == 9 || mode == 3 || mode == 1) {
+	if (mode == 15 || mode == 0 || mode == 8 || mode == 9 || mode == 3 || mode == 1 || mode == 11 || mode == 12 || mode == 13) {
 		ss << "Analog Outputs:\n";
 		for (int i = 0; i < analog_output.size(); i++)
 			ss << "\t[" << i+1 << "] = " << analog_output[i] << std::endl;
 	}
-	if (mode == 15 || mode == 0 || mode == 4 || mode == 5 || mode == 3 || mode == 1) {
+	if (mode == 15 || mode == 0 || mode == 4 || mode == 5 || mode == 3 || mode == 1 || mode == 7 || mode == 12 || mode == 13) {
 		ss << "Digital Outputs:\n";
 		for (int i = 0; i < digital_output.size(); i++)
 			ss << "\t[" << i+1 << "] = " << digital_output[i] << std::endl;
@@ -378,6 +403,7 @@ void ModbusServer::Print(int mode) {
 	std::cout << ss.str();
 }
 
+// Sobrecarga operador <<
 std::ostream& operator<<(std::ostream& os, const ModbusServer& mbs)
 {
 	os << "0x" << std::hex << std::setfill('0') << std::setw(2) << (int)mbs.id << std::dec;

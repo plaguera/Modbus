@@ -87,8 +87,8 @@ enum e_command {
 enum e_error {
 	BAD_COMMAND_SYNTAX,				// Comando válido pero error en argumentos
 	COMMAND_NOT_FOUND,				// No existe tal comando
-	INVALID_DEVICE_ID,				// No existe un dispositivo con el ID especificado
 	INVALID_CRC,					// El CRC adjunto no coincide con el calculado
+	INVALID_DEVICE_ID,				// No existe un dispositivo modbus con el ID especificado
 	UNABLE_TO_OPEN_SOCKET,			// Imposible abrir socket
 	UNABLE_TO_BIND,					// Imposible unir socket, dirección y puerto
 	UNABLE_TO_ACCEPT,				// Imposible aceptar conexión

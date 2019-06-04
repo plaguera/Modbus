@@ -1,5 +1,5 @@
 # Computación Ubicua : Modbus
-#### Pedro Lagüera Cabrera
+#### Pedro Lagüera Cabrera | alu0100891485
 
 ## Instrucciones de Uso
 
@@ -13,37 +13,47 @@ El proyecto incluye un Makefile que compila los archivos necesarios para generar
 
 > make clean
 
-##### Ejecutar
+##### Ejecutar:
 
-> ./main
+> ./ModbusTCP
+
+##### Compilar Tests:
+
+> make tests
+
+##### Ejecutar Tests:
+
+> ./test1
+> ./test2
+> ./test3
 
 ## Comandos
 
-##### Mostrar los Dispositivos Disponibles
+##### Mostrar los Dispositivos Disponibles:
 
 > DEVICES
 
-##### Mostrar los Registros Analógicos, Digitales, Entrada o Salida, o cualquier Combinación
+##### Mostrar los Registros Analógicos, Digitales, Entrada o Salida, o Cualquier Combinación:
 
 > GET  [Analog | Digital | Input | Output]*
 
-##### Mostrar Ayuda
+##### Mostrar Ayuda:
 
 > HELP
 
-##### Seleccionar el Dispositivo sobre el que Ejecutar Comandos o Mostrar el Seleccionado
+##### Seleccionar el Dispositivo sobre el que Ejecutar Comandos o Mostrar el Seleccionado:
 
 > SELECT [Device ID]?
 
-##### Cambiar el Valor de los Últimos 5 Registros Analógicos o Digitales
+##### Cambiar el Valor de los Últimos 5 Registros Analógicos o Digitales:
 
 > SET [Analog | Digital] [position]
 
-##### Parar el Servidor
+##### Parar el Servidor:
 
 > STOP
 
-## Envío de Peticiones
+## Envío de Peticiones:
 
 En vez de escribir un programa cliente dedicado a enviar, se ha optado por hacer uso de múltiples comandos de linux unidos por `|` *pipes*.
 
