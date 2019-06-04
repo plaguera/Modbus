@@ -160,6 +160,7 @@ namespace modbus {
                 break;
             }
             std::cout << "Commands:" << std::endl;
+            std::cout << "\tCONNECTIONS" << std::endl;
             std::cout << "\tDEVICES" << std::endl;
             std::cout << "\tGET  [Analog | Digital | Input | Output]*" << std::endl;
             std::cout << "\tHELP" << std::endl;

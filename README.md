@@ -29,6 +29,10 @@ El proyecto incluye un Makefile que compila los archivos necesarios para generar
 
 ## Comandos
 
+##### Mostrar los Conexiones Abiertas:
+
+> CONNECTIONS
+
 ##### Mostrar los Dispositivos Disponibles:
 
 > DEVICES
